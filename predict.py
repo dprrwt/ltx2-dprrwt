@@ -11,10 +11,8 @@ import torch
 
 # Model paths (downloaded during setup)
 MODEL_DIR = "/src/models/ltx-2"
-# Using FP8 distilled for optimal speed on H100
+# Using FP8 distilled checkpoint for optimal speed on H100
 CHECKPOINT_PATH = f"{MODEL_DIR}/ltx-2-19b-distilled-fp8.safetensors"
-DISTILLED_LORA_PATH = f"{MODEL_DIR}/ltx-2-19b-distilled-lora-384.safetensors"
-SPATIAL_UPSAMPLER_PATH = f"{MODEL_DIR}/ltx-2-spatial-upscaler-x2-1.0.safetensors"
 # gemma_root should point to parent dir containing both text_encoder/ and tokenizer/
 GEMMA_ROOT_PATH = MODEL_DIR
 
@@ -30,35 +28,21 @@ class Predictor(BasePredictor):
             repo_id="Lightricks/LTX-2",
             local_dir=MODEL_DIR,
             allow_patterns=[
-                "ltx-2-19b-distilled-fp8.safetensors",      # Main checkpoint (~27GB)
-                "ltx-2-19b-distilled-lora-384.safetensors", # Distilled LoRA (~7.7GB)
-                "ltx-2-spatial-upscaler-x2-1.0.safetensors", # Spatial upsampler (~1GB)
-                "text_encoder/**",                          # Text encoder
-                "tokenizer/**",                             # Tokenizer
+                "ltx-2-19b-distilled-fp8.safetensors",  # Main checkpoint (~27GB)
+                "text_encoder/**",                      # Text encoder
+                "tokenizer/**",                         # Tokenizer
             ],
         )
         print("Model downloaded successfully")
 
         # Initialize the pipeline using ltx_pipelines
-        print("Loading LTX-2 pipeline...")
-        from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
-        from ltx_core.loader import LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps
+        # Using DistilledPipeline - simplest and fastest, uses predefined sigmas
+        print("Loading LTX-2 DistilledPipeline...")
+        from ltx_pipelines.distilled import DistilledPipeline
 
-        # Configure distilled LoRA for faster inference
-        distilled_lora = [
-            LoraPathStrengthAndSDOps(
-                DISTILLED_LORA_PATH,
-                0.6,
-                LTXV_LORA_COMFY_RENAMING_MAP
-            ),
-        ]
-
-        self.pipe = TI2VidTwoStagesPipeline(
+        self.pipe = DistilledPipeline(
             checkpoint_path=CHECKPOINT_PATH,
-            distilled_lora=distilled_lora,
-            spatial_upsampler_path=SPATIAL_UPSAMPLER_PATH,
             gemma_root=GEMMA_ROOT_PATH,
-            loras=[],
             fp8transformer=True,  # Memory optimization for H100
         )
         print("Pipeline loaded successfully")
@@ -93,18 +77,6 @@ class Predictor(BasePredictor):
             ge=8.0,
             le=60.0
         ),
-        num_inference_steps: int = Input(
-            description="Number of denoising steps (more = better quality, slower)",
-            default=40,
-            ge=1,
-            le=100
-        ),
-        guidance_scale: float = Input(
-            description="CFG guidance scale - how closely to follow the prompt",
-            default=3.0,
-            ge=1.0,
-            le=20.0
-        ),
         seed: int = Input(
             description="Random seed for reproducibility (-1 for random)",
             default=-1
@@ -123,18 +95,17 @@ class Predictor(BasePredictor):
         print(f"Resolution: {width}x{height}, Frames: {num_frames}, FPS: {frame_rate}")
 
         # Generate video frames with memory optimization
+        # DistilledPipeline uses predefined sigmas, no CFG needed
         with torch.inference_mode():
             result = self.pipe(
                 prompt=prompt,
-                negative_prompt="",  # Required argument
-                images=[],  # Empty for text-to-video (no conditioning images)
+                negative_prompt="",
+                images=[],  # Empty for text-to-video
                 seed=seed,
                 height=height,
                 width=width,
                 num_frames=num_frames,
                 frame_rate=frame_rate,
-                num_inference_steps=num_inference_steps,
-                cfg_guidance_scale=guidance_scale,
             )
 
         # Clear CUDA cache to free memory before processing result
