@@ -43,6 +43,8 @@ class Predictor(BasePredictor):
         self.pipe = DistilledPipeline(
             checkpoint_path=CHECKPOINT_PATH,
             gemma_root=GEMMA_ROOT_PATH,
+            spatial_upsampler_path=None,  # No upscaling to save memory
+            loras=[],  # No custom LoRAs
             fp8transformer=True,  # Memory optimization for H100
         )
         print("Pipeline loaded successfully")
@@ -96,10 +98,10 @@ class Predictor(BasePredictor):
 
         # Generate video frames with memory optimization
         # DistilledPipeline uses predefined sigmas, no CFG needed
+        # NOTE: DistilledPipeline does NOT accept negative_prompt (only TI2VidOneStagePipeline does)
         with torch.inference_mode():
             result = self.pipe(
                 prompt=prompt,
-                negative_prompt="",
                 images=[],  # Empty for text-to-video
                 seed=seed,
                 height=height,
@@ -111,48 +113,42 @@ class Predictor(BasePredictor):
         # Clear CUDA cache to free memory before processing result
         torch.cuda.empty_cache()
 
-        # Debug: print what the pipeline returned
+        # DistilledPipeline returns tuple: (video_frames_iterator, audio_tensor)
         print(f"Pipeline returned type: {type(result)}")
-        if hasattr(result, '__dict__'):
-            print(f"Result attributes: {list(result.__dict__.keys())}")
 
-        # Handle different return types from pipeline
         output_path = Path(tempfile.mktemp(suffix=".mp4"))
 
-        if isinstance(result, str) and os.path.exists(result):
-            # Pipeline returned a file path
-            import shutil
-            shutil.move(result, str(output_path))
-        elif hasattr(result, 'frames'):
-            # Pipeline returned an object with frames attribute
-            frames = result.frames
-            if isinstance(frames, torch.Tensor):
-                frames = frames.cpu().numpy()
-            # Normalize to uint8 if needed
-            if frames.max() <= 1.0:
-                frames = (frames * 255).astype(np.uint8)
-            imageio.mimwrite(str(output_path), frames, fps=frame_rate)
-        elif isinstance(result, (list, np.ndarray, torch.Tensor)):
-            # Pipeline returned frames directly
-            frames = result
-            if isinstance(frames, torch.Tensor):
-                frames = frames.cpu().numpy()
-            if isinstance(frames, np.ndarray) and frames.max() <= 1.0:
-                frames = (frames * 255).astype(np.uint8)
-            imageio.mimwrite(str(output_path), frames, fps=frame_rate)
-        else:
-            # Try to find video attribute or save method
-            if hasattr(result, 'video'):
-                frames = result.video
-                if isinstance(frames, torch.Tensor):
-                    frames = frames.cpu().numpy()
+        # Handle tuple return (iterator, audio)
+        if isinstance(result, tuple) and len(result) == 2:
+            frames_iter, audio = result
+            # Collect frames from iterator
+            frames_list = []
+            for frame_batch in frames_iter:
+                if isinstance(frame_batch, torch.Tensor):
+                    frame_batch = frame_batch.cpu().numpy()
+                frames_list.append(frame_batch)
+
+            if frames_list:
+                frames = np.concatenate(frames_list, axis=0) if len(frames_list) > 1 else frames_list[0]
+                # Normalize to uint8 if needed
                 if frames.max() <= 1.0:
                     frames = (frames * 255).astype(np.uint8)
+                # Ensure correct shape: (num_frames, height, width, channels)
+                if frames.ndim == 4 and frames.shape[-1] != 3:
+                    frames = np.transpose(frames, (0, 2, 3, 1))
                 imageio.mimwrite(str(output_path), frames, fps=frame_rate)
-            elif hasattr(result, 'save'):
-                result.save(str(output_path))
             else:
-                raise ValueError(f"Unknown pipeline output type: {type(result)}")
+                raise ValueError("Pipeline returned empty frames iterator")
+        elif isinstance(result, torch.Tensor):
+            # Direct tensor output
+            frames = result.cpu().numpy()
+            if frames.max() <= 1.0:
+                frames = (frames * 255).astype(np.uint8)
+            if frames.ndim == 4 and frames.shape[-1] != 3:
+                frames = np.transpose(frames, (0, 2, 3, 1))
+            imageio.mimwrite(str(output_path), frames, fps=frame_rate)
+        else:
+            raise ValueError(f"Unknown pipeline output type: {type(result)}")
 
         print(f"Video saved to: {output_path}")
         return output_path
