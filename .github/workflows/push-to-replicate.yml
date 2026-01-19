@@ -33,7 +33,7 @@ jobs:
           sudo chmod +x /usr/local/bin/cog
 
       - name: Push to Replicate
-        env:
-          COG_TOKEN: ${{ secrets.COG_TOKEN }}
         run: |
+          mkdir -p ~/.config/cog
+          echo '{"token": "${{ secrets.COG_TOKEN }}"}' > ~/.config/cog/cog.json
           cog push r8.im/dprrwt/ltx2-dprrwt
