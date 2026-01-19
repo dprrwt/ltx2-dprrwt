@@ -13,6 +13,8 @@ import torch
 MODEL_DIR = "/src/models/ltx-2"
 # Using FP8 distilled checkpoint for optimal speed on H100
 CHECKPOINT_PATH = f"{MODEL_DIR}/ltx-2-19b-distilled-fp8.safetensors"
+# Spatial upsampler required by DistilledPipeline
+SPATIAL_UPSAMPLER_PATH = f"{MODEL_DIR}/ltx-2-spatial-upscaler-x2-1.0.safetensors"
 # gemma_root should point to parent dir containing both text_encoder/ and tokenizer/
 GEMMA_ROOT_PATH = MODEL_DIR
 
@@ -28,9 +30,10 @@ class Predictor(BasePredictor):
             repo_id="Lightricks/LTX-2",
             local_dir=MODEL_DIR,
             allow_patterns=[
-                "ltx-2-19b-distilled-fp8.safetensors",  # Main checkpoint (~27GB)
-                "text_encoder/**",                      # Text encoder
-                "tokenizer/**",                         # Tokenizer
+                "ltx-2-19b-distilled-fp8.safetensors",      # Main checkpoint (~27GB)
+                "ltx-2-spatial-upscaler-x2-1.0.safetensors", # Spatial upsampler (~1GB)
+                "text_encoder/**",                           # Text encoder
+                "tokenizer/**",                              # Tokenizer
             ],
         )
         print("Model downloaded successfully")
@@ -43,7 +46,7 @@ class Predictor(BasePredictor):
         self.pipe = DistilledPipeline(
             checkpoint_path=CHECKPOINT_PATH,
             gemma_root=GEMMA_ROOT_PATH,
-            spatial_upsampler_path=None,  # No upscaling to save memory
+            spatial_upsampler_path=SPATIAL_UPSAMPLER_PATH,
             loras=[],  # No custom LoRAs
             fp8transformer=True,  # Memory optimization for H100
         )
