@@ -26,6 +26,11 @@ class Predictor(BasePredictor):
             "Lightricks/LTX-Video",
             torch_dtype=torch.bfloat16,
         )
+
+        # Convert VAE to float32 to avoid numerical issues during decode
+        print("Converting VAE to float32...")
+        self.pipe.vae = self.pipe.vae.to(dtype=torch.float32)
+
         self.pipe.to("cuda")
 
         # Enable VAE optimizations
