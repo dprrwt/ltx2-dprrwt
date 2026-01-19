@@ -15,7 +15,8 @@ MODEL_DIR = "/src/models/ltx-2"
 CHECKPOINT_PATH = f"{MODEL_DIR}/ltx-2-19b-distilled-fp8.safetensors"
 DISTILLED_LORA_PATH = f"{MODEL_DIR}/ltx-2-19b-distilled-lora-384.safetensors"
 SPATIAL_UPSAMPLER_PATH = f"{MODEL_DIR}/ltx-2-spatial-upscaler-x2-1.0.safetensors"
-TEXT_ENCODER_PATH = f"{MODEL_DIR}/text_encoder"
+# gemma_root should point to parent dir containing both text_encoder/ and tokenizer/
+GEMMA_ROOT_PATH = MODEL_DIR
 
 
 class Predictor(BasePredictor):
@@ -49,7 +50,7 @@ class Predictor(BasePredictor):
             checkpoint_path=CHECKPOINT_PATH,
             distilled_lora=distilled_lora,
             spatial_upsampler_path=SPATIAL_UPSAMPLER_PATH,
-            gemma_root=TEXT_ENCODER_PATH,
+            gemma_root=GEMMA_ROOT_PATH,
             loras=[],
             fp8transformer=True,  # Memory optimization for H100
         )
