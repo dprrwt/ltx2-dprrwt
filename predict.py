@@ -103,7 +103,8 @@ class Predictor(BasePredictor):
         gc.collect()
         torch.cuda.empty_cache()
 
-        print("Starting generation...")
+        print("Starting generation (latent output)...")
+        # First get latents to isolate the issue
         result = self.pipe(
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -113,15 +114,36 @@ class Predictor(BasePredictor):
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
             generator=generator,
+            output_type="latent",  # Skip VAE decode in pipeline
         )
-        print("Generation complete, extracting frames...")
+        print("Diffusion complete, got latents")
+        latents = result.frames
+        print(f"Latent shape: {latents.shape}")
 
-        video = result.frames[0]
-        print(f"Extracted {len(video)} frames")
-
-        # Clear CUDA cache
+        # Clear memory before VAE decode
         gc.collect()
         torch.cuda.empty_cache()
+
+        # Manually decode with VAE
+        print("Decoding latents with VAE...")
+        with torch.no_grad():
+            # Move VAE to GPU explicitly
+            self.pipe.vae.to("cuda")
+            video_tensor = self.pipe.vae.decode(latents.to("cuda")).sample
+            print(f"Decoded tensor shape: {video_tensor.shape}")
+
+        # Convert to frames
+        video_tensor = video_tensor.cpu()
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        # Process frames for export
+        print("Processing frames...")
+        video_tensor = (video_tensor / 2 + 0.5).clamp(0, 1)
+        video_tensor = video_tensor.permute(0, 2, 3, 4, 1)  # B, F, H, W, C
+        video_np = (video_tensor[0] * 255).numpy().astype("uint8")
+        video = [frame for frame in video_np]
+        print(f"Processed {len(video)} frames")
 
         # Export to video file
         output_path = Path(tempfile.mktemp(suffix=".mp4"))
