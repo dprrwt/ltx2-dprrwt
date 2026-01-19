@@ -104,6 +104,8 @@ class Predictor(BasePredictor):
         ),
     ) -> Path:
         """Generate a video from text prompt"""
+        import imageio
+        import numpy as np
 
         # Handle seed
         if seed == -1:
@@ -113,13 +115,9 @@ class Predictor(BasePredictor):
         print(f"Prompt: {prompt}")
         print(f"Resolution: {width}x{height}, Frames: {num_frames}, FPS: {frame_rate}")
 
-        # Create output path
-        output_path = Path(tempfile.mktemp(suffix=".mp4"))
-
-        # Generate video
-        self.pipe(
+        # Generate video frames
+        result = self.pipe(
             prompt=prompt,
-            output_path=str(output_path),
             seed=seed,
             height=height,
             width=width,
@@ -128,6 +126,44 @@ class Predictor(BasePredictor):
             num_inference_steps=num_inference_steps,
             cfg_guidance_scale=guidance_scale,
         )
+
+        # Handle different return types from pipeline
+        output_path = Path(tempfile.mktemp(suffix=".mp4"))
+
+        if isinstance(result, str) and os.path.exists(result):
+            # Pipeline returned a file path
+            import shutil
+            shutil.move(result, str(output_path))
+        elif hasattr(result, 'frames'):
+            # Pipeline returned an object with frames attribute
+            frames = result.frames
+            if isinstance(frames, torch.Tensor):
+                frames = frames.cpu().numpy()
+            # Normalize to uint8 if needed
+            if frames.max() <= 1.0:
+                frames = (frames * 255).astype(np.uint8)
+            imageio.mimwrite(str(output_path), frames, fps=frame_rate)
+        elif isinstance(result, (list, np.ndarray, torch.Tensor)):
+            # Pipeline returned frames directly
+            frames = result
+            if isinstance(frames, torch.Tensor):
+                frames = frames.cpu().numpy()
+            if isinstance(frames, np.ndarray) and frames.max() <= 1.0:
+                frames = (frames * 255).astype(np.uint8)
+            imageio.mimwrite(str(output_path), frames, fps=frame_rate)
+        else:
+            # Try to find video attribute or save method
+            if hasattr(result, 'video'):
+                frames = result.video
+                if isinstance(frames, torch.Tensor):
+                    frames = frames.cpu().numpy()
+                if frames.max() <= 1.0:
+                    frames = (frames * 255).astype(np.uint8)
+                imageio.mimwrite(str(output_path), frames, fps=frame_rate)
+            elif hasattr(result, 'save'):
+                result.save(str(output_path))
+            else:
+                raise ValueError(f"Unknown pipeline output type: {type(result)}")
 
         print(f"Video saved to: {output_path}")
         return output_path
