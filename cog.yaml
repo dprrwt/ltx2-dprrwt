@@ -4,7 +4,7 @@
 
 build:
   gpu: true
-  cuda: "12.1"
+  cuda: "12.4"
   python_version: "3.11"
 
   system_packages:
@@ -13,25 +13,19 @@ build:
     - "libxext6"
     - "libgl1"
 
+  # Note: torch/torchvision/torchaudio are installed by ltx-core with correct versions
   python_packages:
-    - "torch==2.5.0"
-    - "torchvision==0.20.0"
-    - "torchaudio==2.5.0"
-    - "transformers>=4.47.0"
-    - "accelerate>=0.34.0"
-    - "diffusers>=0.32.0"
-    - "safetensors>=0.4.0"
-    - "sentencepiece>=0.2.0"
     - "huggingface_hub>=0.26.0"
     - "imageio>=2.36.0"
     - "imageio-ffmpeg>=0.5.1"
-    - "einops>=0.8.0"
-    - "numpy<2.0.0"
     - "pillow>=10.0.0"
 
   run:
+    # Install ltx-core first - it will install compatible torch~=2.7
     - "pip install git+https://github.com/Lightricks/LTX-2.git#subdirectory=packages/ltx-core"
     - "pip install git+https://github.com/Lightricks/LTX-2.git#subdirectory=packages/ltx-pipelines"
+    # Install torchvision matching the torch version ltx-core installed
+    - "pip install torchvision"
 
 predict: "predict.py:Predictor"
 
