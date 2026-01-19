@@ -22,10 +22,14 @@ class Predictor(BasePredictor):
             "Lightricks/LTX-Video",
             torch_dtype=torch.bfloat16,
         )
-        self.pipe.to("cuda")
 
-        # Enable memory optimizations
-        self.pipe.enable_model_cpu_offload()
+        # Use sequential CPU offload - moves only active component to GPU
+        # This is more aggressive memory management
+        self.pipe.enable_sequential_cpu_offload()
+
+        # Enable VAE optimizations
+        self.pipe.vae.enable_tiling()
+        self.pipe.vae.enable_slicing()
 
         print("Pipeline loaded successfully")
 
@@ -37,21 +41,21 @@ class Predictor(BasePredictor):
         ),
         width: int = Input(
             description="Video width in pixels (must be divisible by 32)",
-            default=704,
+            default=512,  # Reduced for memory safety
             ge=256,
-            le=1280
+            le=768
         ),
         height: int = Input(
             description="Video height in pixels (must be divisible by 32)",
-            default=480,
+            default=320,  # Reduced for memory safety
             ge=256,
-            le=720
+            le=512
         ),
         num_frames: int = Input(
-            description="Number of frames to generate (must be 8n+1). Use 97 for ~4sec, 161 for ~6.5sec",
-            default=97,
+            description="Number of frames to generate (must be 8n+1). Use 49 for ~2sec, 97 for ~4sec",
+            default=49,  # Reduced for memory safety
             ge=9,
-            le=161
+            le=97
         ),
         num_inference_steps: int = Input(
             description="Number of denoising steps (more = better quality but slower)",
@@ -89,12 +93,18 @@ class Predictor(BasePredictor):
         # Ensure frames follow 8n+1 pattern
         num_frames = ((num_frames - 1) // 8) * 8 + 1
 
-        generator = torch.Generator("cuda").manual_seed(seed)
+        generator = torch.Generator().manual_seed(seed)  # CPU generator for offload compatibility
 
         # Generate video
         negative_prompt = "worst quality, inconsistent motion, blurry, jittery, distorted"
 
-        video = self.pipe(
+        # Clear memory before generation
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        print("Starting generation...")
+        result = self.pipe(
             prompt=prompt,
             negative_prompt=negative_prompt,
             width=width,
@@ -103,9 +113,14 @@ class Predictor(BasePredictor):
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
             generator=generator,
-        ).frames[0]
+        )
+        print("Generation complete, extracting frames...")
+
+        video = result.frames[0]
+        print(f"Extracted {len(video)} frames")
 
         # Clear CUDA cache
+        gc.collect()
         torch.cuda.empty_cache()
 
         # Export to video file
