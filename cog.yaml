@@ -14,10 +14,10 @@ build:
     - "libgl1"
 
   python_packages:
-    - "torch==2.4.1"
-    - "torchvision==0.19.1"
-    - "torchaudio==2.4.1"
-    - "transformers>=4.46.0"
+    - "torch==2.5.0"
+    - "torchvision==0.20.0"
+    - "torchaudio==2.5.0"
+    - "transformers>=4.47.0"
     - "accelerate>=0.34.0"
     - "diffusers>=0.32.0"
     - "safetensors>=0.4.0"
@@ -27,6 +27,7 @@ build:
     - "imageio-ffmpeg>=0.5.1"
     - "einops>=0.8.0"
     - "numpy<2.0.0"
+    - "pillow>=10.0.0"
 
   run:
     - "pip install git+https://github.com/Lightricks/LTX-2.git#subdirectory=packages/ltx-core"
