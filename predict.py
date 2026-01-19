@@ -24,11 +24,18 @@ class Predictor(BasePredictor):
         """Download and load LTX-2 model into memory"""
         from huggingface_hub import snapshot_download
 
-        # Download model weights from HuggingFace
+        # Download only the files we need (not the entire 314GB repo)
         print("Downloading LTX-2 model from HuggingFace...")
         snapshot_download(
             repo_id="Lightricks/LTX-2",
             local_dir=MODEL_DIR,
+            allow_patterns=[
+                "ltx-2-19b-distilled-fp8.safetensors",      # Main checkpoint (~27GB)
+                "ltx-2-19b-distilled-lora-384.safetensors", # Distilled LoRA (~7.7GB)
+                "ltx-2-spatial-upscaler-x2-1.0.safetensors", # Spatial upsampler (~1GB)
+                "text_encoder/**",                          # Text encoder
+                "tokenizer/**",                             # Tokenizer
+            ],
         )
         print("Model downloaded successfully")
 
