@@ -2,11 +2,9 @@
 # Model: Lightricks/LTX-2 (text-to-video + audio)
 # Hardware: H100
 
-
 build:
   gpu: true
-  cuda: "12.4"
-  python_version: "3.12"
+  python_version: "3.11"
 
   system_packages:
     - "ffmpeg"
