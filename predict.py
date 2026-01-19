@@ -120,6 +120,9 @@ class Predictor(BasePredictor):
                 num_inference_steps=num_inference_steps,
                 guidance_scale=guidance_scale,
                 generator=generator,
+                # VAE decode parameters - required for timestep-aware VAE
+                decode_timestep=0.03,
+                decode_noise_scale=0.025,
             )
             print("Generation complete!")
             print(f"Result type: {type(result)}")
