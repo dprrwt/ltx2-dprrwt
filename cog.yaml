@@ -1,0 +1,36 @@
+# LTX-2 Video Generation Model for Replicate
+# Model: Lightricks/LTX-2 (text-to-video + audio)
+# Hardware: H100
+
+build:
+  gpu: true
+  cuda: "12.4"
+  python_version: "3.12"
+
+  system_packages:
+    - "ffmpeg"
+    - "libsm6"
+    - "libxext6"
+    - "libgl1"
+
+  python_packages:
+    - "torch==2.5.1"
+    - "torchvision==0.20.1"
+    - "torchaudio==2.5.1"
+    - "transformers>=4.46.0"
+    - "accelerate>=0.34.0"
+    - "diffusers>=0.32.0"
+    - "safetensors>=0.4.0"
+    - "sentencepiece>=0.2.0"
+    - "huggingface_hub>=0.26.0"
+    - "imageio>=2.36.0"
+    - "imageio-ffmpeg>=0.5.1"
+    - "einops>=0.8.0"
+    - "numpy<2.0.0"
+
+  run:
+    - "pip install git+https://github.com/Lightricks/LTX-2.git"
+
+predict: "predict.py:Predictor"
+
+image: "r8.im/dprrwt/ltx2-dprrwt"
