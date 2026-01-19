@@ -83,7 +83,7 @@ class Predictor(BasePredictor):
         ),
         num_frames: int = Input(
             description="Number of frames to generate (more frames = longer video). Use 121 for ~5sec, 241 for ~10sec",
-            default=241,
+            default=121,  # ~5 seconds, safer for memory
             ge=9,
             le=257
         ),
@@ -122,19 +122,28 @@ class Predictor(BasePredictor):
         print(f"Prompt: {prompt}")
         print(f"Resolution: {width}x{height}, Frames: {num_frames}, FPS: {frame_rate}")
 
-        # Generate video frames
-        result = self.pipe(
-            prompt=prompt,
-            negative_prompt="",  # Required argument
-            images=[],  # Empty for text-to-video (no conditioning images)
-            seed=seed,
-            height=height,
-            width=width,
-            num_frames=num_frames,
-            frame_rate=frame_rate,
-            num_inference_steps=num_inference_steps,
-            cfg_guidance_scale=guidance_scale,
-        )
+        # Generate video frames with memory optimization
+        with torch.inference_mode():
+            result = self.pipe(
+                prompt=prompt,
+                negative_prompt="",  # Required argument
+                images=[],  # Empty for text-to-video (no conditioning images)
+                seed=seed,
+                height=height,
+                width=width,
+                num_frames=num_frames,
+                frame_rate=frame_rate,
+                num_inference_steps=num_inference_steps,
+                cfg_guidance_scale=guidance_scale,
+            )
+
+        # Clear CUDA cache to free memory before processing result
+        torch.cuda.empty_cache()
+
+        # Debug: print what the pipeline returned
+        print(f"Pipeline returned type: {type(result)}")
+        if hasattr(result, '__dict__'):
+            print(f"Result attributes: {list(result.__dict__.keys())}")
 
         # Handle different return types from pipeline
         output_path = Path(tempfile.mktemp(suffix=".mp4"))
