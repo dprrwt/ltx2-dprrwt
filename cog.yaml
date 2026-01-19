@@ -29,7 +29,8 @@ build:
     - "numpy<2.0.0"
 
   run:
-    - "pip install git+https://github.com/Lightricks/LTX-2.git"
+    - "pip install git+https://github.com/Lightricks/LTX-2.git#subdirectory=packages/ltx-core"
+    - "pip install git+https://github.com/Lightricks/LTX-2.git#subdirectory=packages/ltx-pipelines"
 
 predict: "predict.py:Predictor"
 
