@@ -125,6 +125,8 @@ class Predictor(BasePredictor):
         # Generate video frames
         result = self.pipe(
             prompt=prompt,
+            negative_prompt="",  # Required argument
+            images=[],  # Empty for text-to-video (no conditioning images)
             seed=seed,
             height=height,
             width=width,
