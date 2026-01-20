@@ -1,6 +1,6 @@
 """
 LTX-Video Generation Model - Replicate Predictor
-Based on working implementation from georgedavila/cog-ltx-video
+Weights baked into container for fast cold boot
 """
 
 import os
@@ -11,23 +11,34 @@ import torch
 from diffusers import LTXPipeline
 from diffusers.utils import export_to_video
 
+# Path where weights are baked into container (downloaded during cog build)
+MODEL_PATH = "/src/models/ltx-video"
+
 
 class Predictor(BasePredictor):
     def setup(self):
-        """Load LTX-Video model"""
-        print("Loading LTX-Video pipeline...")
+        """Load LTX-Video model from local path (no download needed)"""
+        print("=" * 50)
+        print("LTX-Video Setup - Loading from baked weights")
+        print("=" * 50)
         print(f"PyTorch version: {torch.__version__}")
         print(f"CUDA available: {torch.cuda.is_available()}")
         if torch.cuda.is_available():
             print(f"CUDA device: {torch.cuda.get_device_name(0)}")
             print(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
+        print(f"Loading model from: {MODEL_PATH}")
+
+        # Load from local path (baked into container)
         self.pipe = LTXPipeline.from_pretrained(
-            "Lightricks/LTX-Video",
+            MODEL_PATH,
             torch_dtype=torch.bfloat16,
+            local_files_only=True,  # Don't try to download, use local only
         )
         self.pipe.to("cuda")
-        print("Pipeline loaded successfully")
+
+        print("Pipeline loaded successfully!")
+        print("=" * 50)
 
     def predict(
         self,
