@@ -1,5 +1,5 @@
 # LTX-Video Generation Model for Replicate
-# Based on working config from georgedavila/cog-ltx-video
+# Weights BAKED into container for fast cold boot
 # Hardware: H100
 
 build:
@@ -26,6 +26,10 @@ build:
     - "accelerate==1.2.1"
     - "imageio==2.36.1"
     - "imageio-ffmpeg==0.5.1"
+
+  run:
+    # Download LTX-Video weights during build (baked into container)
+    - "python -c \"from huggingface_hub import snapshot_download; snapshot_download(repo_id='Lightricks/LTX-Video', local_dir='/src/models/ltx-video')\""
 
 predict: "predict.py:Predictor"
 
